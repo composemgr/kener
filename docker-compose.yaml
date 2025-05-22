@@ -1,0 +1,61 @@
+# nginx proxy address - http://172.17.0.1:61001
+
+name: kener
+x-logging: &default-logging
+  options:
+    max-size: '5m'
+    max-file: '1'
+  driver: json-file
+
+services:
+  app:
+    image: rajnandan1/kener:latest
+    container_name: kener-app
+    hostname: ${BASE_HOST_NAME:-$HOSTNAME}
+    restart: always
+    pull_policy: always
+    logging: *default-logging
+    environment:
+      - PORT=3000
+      - KENER_BASE_PATH=/
+      - TZ=${TZ:-America/New_York}
+      - NODE_ENV=production
+      - DATABASE_URL=kener-db
+      - ORIGIN=https://${BASE_HOST_NAME:-$HOSTNAME}
+      - KENER_SECRET_KEY=${APP_SECRET_TOKEN_16:-5nHDioSbReExOtPK}
+      - DATABASE_URL=postgresql://postgres:rXZWe7vOlK4UCsx7@kener-db:5432/kener
+    ports:
+      - '172.17.0.1:61001:3000/tcp'
+    volumes:
+      - '/var/lib/srv/${USER}/docker/kener/rootfs/data/kener/uploads:/app/uploads'
+      - '/var/lib/srv/${USER}/docker/kener/rootfs/data/kener/database:/app/database'
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - kener
+
+  db:
+    image: postgres:alpine
+    container_name: kener-db
+    restart: always
+    pull_policy: always
+    environment:
+      - POSTGRES_DB=kener
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=rXZWe7vOlK4UCsx7
+      - TZ=${TZ:-America/New_York}
+    volumes:
+      - '/var/lib/srv/${USER}/databases/postgres/kener:/data'
+    healthcheck:
+      test: ['CMD-SHELL', 'runuser', '-u', 'postgres', '--', 'pg_isready']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kener
+
+networks:
+  kener:
+    name: kener
+    external: false
