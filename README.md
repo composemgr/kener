@@ -52,9 +52,9 @@ See `docker-compose.yaml` for complete list of configurable options.
 
 ## 📂 Volumes
 
-- `./rootfs/data/kener` - Data storage
-- `./rootfs/data/kener/database` - Data storage
-- `./rootfs/data/db/postgres/kener` - Data storage
+- `./volumes/data/kener` - Data storage
+- `./volumes/data/kener/database` - Data storage
+- `./volumes/data/db/postgres/kener` - Data storage
 
 ## 🔐 Security
 
