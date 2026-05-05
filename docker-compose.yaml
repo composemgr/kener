@@ -26,8 +26,8 @@ services:
     ports:
       - '172.17.0.1:61001:3000/tcp'
     volumes:
-      - './rootfs/data/kener:/app/uploads'
-      - './rootfs/data/kener/database:/app/database'
+      - './volumes/data/kener:/app/uploads'
+      - './volumes/data/kener/database:/app/database'
     depends_on:
       db:
         condition: service_healthy
@@ -47,7 +47,7 @@ services:
       POSTGRES_USER: ${DB_USER_NAME:-postgres}
       POSTGRES_PASSWORD: ${DB_USER_PASS:-changeme_db_password}
     volumes:
-      - './rootfs/data/db/postgres/kener:/data'
+      - './volumes/data/db/postgres/kener:/data'
     healthcheck:
       test: ['CMD-SHELL', 'runuser', '-u', 'postgres', '--', 'pg_isready']
       interval: 10s
