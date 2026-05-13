@@ -23,6 +23,7 @@ services:
       ORIGIN: https://${BASE_HOST_NAME:-$HOSTNAME}
       KENER_SECRET_KEY: ${APP_SECRET_KEY:-changeme_secret_key}
       DATABASE_URL: postgresql://${DB_USER_NAME:-postgres}:${DB_USER_PASS:-changeme_db_password}@kener-db:5432/${DB_CREATE_DATABASE_NAME:-kener}
+      REDIS_URL: redis://kener-redis:6379
       CONTAINER_NAME: kener-app
       HOSTNAME: ${BASE_HOST_NAME:-$HOSTNAME}
     ports:
@@ -32,6 +33,8 @@ services:
       - './volumes/data/kener/database:/app/database'
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - kener
@@ -53,6 +56,26 @@ services:
       - 'traefik.http.routers.kener-app-secure.tls.certresolver=cloudflare'
       - 'traefik.http.routers.kener-app-secure.service=kener-app'
       - 'traefik.http.services.kener-app.loadbalancer.server.port=3000'
+
+  redis:
+    image: redis:alpine
+    container_name: kener-redis
+    hostname: kener-redis
+    restart: always
+    pull_policy: always
+    logging: *default-logging
+    environment:
+      TZ: ${TZ:-America/New_York}
+      CONTAINER_NAME: kener-redis
+    volumes:
+      - './volumes/data/db/redis/kener:/data'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kener
 
   db:
     image: postgres:alpine
