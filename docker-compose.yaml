@@ -47,7 +47,7 @@ services:
       POSTGRES_USER: ${DB_USER_NAME:-postgres}
       POSTGRES_PASSWORD: ${DB_USER_PASS:-changeme_db_password}
     volumes:
-      - './volumes/data/db/postgres/kener:/data'
+      - './volumes/data/db/postgres/kener:/var/lib/postgresql/data'
     healthcheck:
       test: ['CMD-SHELL', 'runuser', '-u', 'postgres', '--', 'pg_isready']
       interval: 10s
