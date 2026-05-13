@@ -23,6 +23,8 @@ services:
       ORIGIN: https://${BASE_HOST_NAME:-$HOSTNAME}
       KENER_SECRET_KEY: ${APP_SECRET_KEY:-changeme_secret_key}
       DATABASE_URL: postgresql://${DB_USER_NAME:-postgres}:${DB_USER_PASS:-changeme_db_password}@kener-db:5432/${DB_CREATE_DATABASE_NAME:-kener}
+      CONTAINER_NAME: kener-app
+      HOSTNAME: ${BASE_HOST_NAME:-$HOSTNAME}
     ports:
       - '172.17.0.1:61001:3000/tcp'
     volumes:
@@ -33,6 +35,24 @@ services:
         condition: service_healthy
     networks:
       - kener
+      - proxy
+      - cloudflare
+    labels:
+      - 'traefik.enable=true'
+      - 'cloudflare.enable=true'
+      - 'traefik.docker.network=proxy'
+      - 'cloudflare.service=http://kener-app:3000'
+      - 'cloudflare.hostname=kener.${CLOUDFLARE_ZONE_NAME:-}'
+      - 'traefik.http.routers.kener-app.entrypoints=http'
+      - 'traefik.http.routers.kener-app-secure.tls=true'
+      - 'traefik.http.routers.kener-app.rule=Host($(${BASE_HOST_NAME:-$HOSTNAME}))'
+      - 'traefik.http.middlewares.kener-app-https-redirect.redirectscheme.scheme=https'
+      - 'traefik.http.routers.kener-app.middlewares=kener-app-https-redirect'
+      - 'traefik.http.routers.kener-app-secure.entrypoints=https'
+      - 'traefik.http.routers.kener-app-secure.rule=Host($(${BASE_HOST_NAME:-$HOSTNAME}))'
+      - 'traefik.http.routers.kener-app-secure.tls.certresolver=cloudflare'
+      - 'traefik.http.routers.kener-app-secure.service=kener-app'
+      - 'traefik.http.services.kener-app.loadbalancer.server.port=3000'
 
   db:
     image: postgres:alpine
@@ -46,6 +66,7 @@ services:
       POSTGRES_DB: ${DB_CREATE_DATABASE_NAME:-kener}
       POSTGRES_USER: ${DB_USER_NAME:-postgres}
       POSTGRES_PASSWORD: ${DB_USER_PASS:-changeme_db_password}
+      CONTAINER_NAME: kener-db
     volumes:
       - './volumes/data/db/postgres/kener:/var/lib/postgresql/data'
     healthcheck:
@@ -60,3 +81,7 @@ networks:
   kener:
     name: kener
     external: false
+  proxy:
+    external: true
+  cloudflare:
+    external: true
