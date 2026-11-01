@@ -1,4 +1,4 @@
-# nginx proxy address - http://172.17.0.1:61001
+# nginx proxy address - http://172.17.0.1:64221
 
 name: kener
 x-logging: &default-logging
@@ -16,21 +16,21 @@ services:
     pull_policy: always
     logging: *default-logging
     environment:
-      PORT: 3000
       TZ: ${TZ:-America/New_York}
+      CONTAINER_NAME: kener-app
+      HOSTNAME: ${BASE_HOST_NAME:-$HOSTNAME}
+      PORT: 3000
       NODE_ENV: production
       KENER_BASE_PATH: /
       ORIGIN: https://${BASE_HOST_NAME:-$HOSTNAME}
-      KENER_SECRET_KEY: ${APP_SECRET_KEY:-changeme_secret_key}
-      DATABASE_URL: postgresql://${DB_USER_NAME:-postgres}:${DB_USER_PASS:-changeme_db_password}@kener-db:5432/${DB_CREATE_DATABASE_NAME:-kener}
+      KENER_SECRET_KEY: ${APP_SECRET_KEY:-replace-with-a-random-16-byte-hex-string}
+      DATABASE_URL: postgresql://${DB_USER_NAME:-kener}:${DB_USER_PASS:-replace-with-a-random-password}@kener-db:5432/${DB_CREATE_DATABASE_NAME:-kener}
       REDIS_URL: redis://kener-redis:6379
-      CONTAINER_NAME: kener-app
-      HOSTNAME: ${BASE_HOST_NAME:-$HOSTNAME}
     ports:
-      - '172.17.0.1:61001:3000/tcp'
+      - '172.17.0.1:64221:3000'
     volumes:
-      - './volumes/data/kener:/app/uploads'
-      - './volumes/data/kener/database:/app/database'
+      - './volumes/data/kener:/app/uploads:z'
+      - './volumes/data/kener/database:/app/database:z'
     depends_on:
       db:
         condition: service_healthy
@@ -38,28 +38,35 @@ services:
         condition: service_healthy
     networks:
       - kener
-      - proxy
-      - cloudflare
-    labels:
-      - 'traefik.enable=true'
-      - 'cloudflare.enable=true'
-      - 'traefik.docker.network=proxy'
-      - 'cloudflare.service=http://kener-app:3000'
-      - 'cloudflare.hostname=kener.${CLOUDFLARE_ZONE_NAME:-}'
-      - 'traefik.http.routers.kener-app.entrypoints=http'
-      - 'traefik.http.routers.kener-app-secure.tls=true'
-      - 'traefik.http.routers.kener-app.rule=Host($(${BASE_HOST_NAME:-$HOSTNAME}))'
-      - 'traefik.http.middlewares.kener-app-https-redirect.redirectscheme.scheme=https'
-      - 'traefik.http.routers.kener-app.middlewares=kener-app-https-redirect'
-      - 'traefik.http.routers.kener-app-secure.entrypoints=https'
-      - 'traefik.http.routers.kener-app-secure.rule=Host($(${BASE_HOST_NAME:-$HOSTNAME}))'
-      - 'traefik.http.routers.kener-app-secure.tls.certresolver=cloudflare'
-      - 'traefik.http.routers.kener-app-secure.service=kener-app'
-      - 'traefik.http.services.kener-app.loadbalancer.server.port=3000'
+
+  db:
+    image: postgres:alpine
+    container_name: kener-db
+    domainname: ${BASE_DOMAIN_NAME:-example.com}
+    hostname: kener-db
+    restart: always
+    pull_policy: always
+    logging: *default-logging
+    environment:
+      TZ: ${TZ:-America/New_York}
+      CONTAINER_NAME: kener-db
+      POSTGRES_DB: ${DB_CREATE_DATABASE_NAME:-kener}
+      POSTGRES_USER: ${DB_USER_NAME:-kener}
+      POSTGRES_PASSWORD: ${DB_USER_PASS:-replace-with-a-random-password}
+    volumes:
+      - './volumes/db/postgres/kener:/var/lib/postgresql/data:z'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USER_NAME:-kener} -d ${DB_CREATE_DATABASE_NAME:-kener}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kener
 
   redis:
     image: redis:alpine
     container_name: kener-redis
+    domainname: ${BASE_DOMAIN_NAME:-example.com}
     hostname: kener-redis
     restart: always
     pull_policy: always
@@ -68,32 +75,9 @@ services:
       TZ: ${TZ:-America/New_York}
       CONTAINER_NAME: kener-redis
     volumes:
-      - './volumes/data/db/redis/kener:/data'
+      - './volumes/db/redis/kener:/data:z'
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - kener
-
-  db:
-    image: postgres:alpine
-    container_name: kener-db
-    hostname: kener-db
-    restart: always
-    pull_policy: always
-    logging: *default-logging
-    environment:
-      TZ: ${TZ:-America/New_York}
-      POSTGRES_DB: ${DB_CREATE_DATABASE_NAME:-kener}
-      POSTGRES_USER: ${DB_USER_NAME:-postgres}
-      POSTGRES_PASSWORD: ${DB_USER_PASS:-changeme_db_password}
-      CONTAINER_NAME: kener-db
-    volumes:
-      - './volumes/data/db/postgres/kener:/var/lib/postgresql/data'
-    healthcheck:
-      test: ['CMD-SHELL', 'runuser', '-u', 'postgres', '--', 'pg_isready']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -104,7 +88,3 @@ networks:
   kener:
     name: kener
     external: false
-  proxy:
-    external: true
-  cloudflare:
-    external: true

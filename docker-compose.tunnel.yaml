@@ -1,0 +1,93 @@
+name: kener
+x-logging: &default-logging
+  options:
+    max-size: '5m'
+    max-file: '1'
+  driver: json-file
+
+services:
+  app:
+    image: rajnandan1/kener:latest
+    container_name: kener-app
+    hostname: ${BASE_HOST_NAME:-$HOSTNAME}
+    restart: always
+    pull_policy: always
+    logging: *default-logging
+    environment:
+      TZ: ${TZ:-America/New_York}
+      CONTAINER_NAME: kener-app
+      HOSTNAME: ${BASE_HOST_NAME:-$HOSTNAME}
+      PORT: 3000
+      NODE_ENV: production
+      KENER_BASE_PATH: /
+      ORIGIN: https://${BASE_HOST_NAME:-$HOSTNAME}
+      KENER_SECRET_KEY: ${APP_SECRET_KEY:-replace-with-a-random-16-byte-hex-string}
+      DATABASE_URL: postgresql://${DB_USER_NAME:-kener}:${DB_USER_PASS:-replace-with-a-random-password}@kener-db:5432/${DB_CREATE_DATABASE_NAME:-kener}
+      REDIS_URL: redis://kener-redis:6379
+    volumes:
+      - './volumes/data/kener:/app/uploads:z'
+      - './volumes/data/kener/database:/app/database:z'
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    labels:
+      - 'cloudflare.enable=true'
+      - 'cloudflare.service=http://kener-app:3000'
+      - 'cloudflare.hostname=${BASE_HOST_NAME:-$HOSTNAME}'
+    networks:
+      - kener
+      - cloudflare
+
+  db:
+    image: postgres:alpine
+    container_name: kener-db
+    domainname: ${BASE_DOMAIN_NAME:-example.com}
+    hostname: kener-db
+    restart: always
+    pull_policy: always
+    logging: *default-logging
+    environment:
+      TZ: ${TZ:-America/New_York}
+      CONTAINER_NAME: kener-db
+      POSTGRES_DB: ${DB_CREATE_DATABASE_NAME:-kener}
+      POSTGRES_USER: ${DB_USER_NAME:-kener}
+      POSTGRES_PASSWORD: ${DB_USER_PASS:-replace-with-a-random-password}
+    volumes:
+      - './volumes/db/postgres/kener:/var/lib/postgresql/data:z'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USER_NAME:-kener} -d ${DB_CREATE_DATABASE_NAME:-kener}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kener
+
+  redis:
+    image: redis:alpine
+    container_name: kener-redis
+    domainname: ${BASE_DOMAIN_NAME:-example.com}
+    hostname: kener-redis
+    restart: always
+    pull_policy: always
+    logging: *default-logging
+    environment:
+      TZ: ${TZ:-America/New_York}
+      CONTAINER_NAME: kener-redis
+    volumes:
+      - './volumes/db/redis/kener:/data:z'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kener
+
+networks:
+  kener:
+    name: kener
+    external: false
+  cloudflare:
+    external: true
