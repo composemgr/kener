@@ -26,6 +26,12 @@ services:
       KENER_SECRET_KEY: ${APP_SECRET_KEY:-replace-with-a-random-16-byte-hex-string}
       DATABASE_URL: postgresql://${DB_USER_NAME:-kener}:${DB_USER_PASS:-replace-with-a-random-password}@kener-db:5432/${DB_CREATE_DATABASE_NAME:-kener}
       REDIS_URL: redis://kener-redis:6379
+    healthcheck:
+      test: ['CMD-SHELL', 'sh -c ''curl -sf http://localhost:$${PORT}$${KENER_BASE_PATH}/healthcheck || exit 1''']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     ports:
       - '172.17.0.1:64221:3000'
     volumes:
